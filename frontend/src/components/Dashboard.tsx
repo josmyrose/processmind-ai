@@ -1,12 +1,16 @@
 import { useId, useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
 import API from "../api/api";
+import type { User } from "./AuthPage";
 
 type UploadResponse = {
   message?: string;
   rows?: number;
   columns?: string[];
   error?: string;
+  missing_columns?: string[];
+  detected_columns?: string[];
+  accepted_aliases?: Record<string, string[]>;
 };
 
 const expectedColumns = ["case_id", "activity", "timestamp"];
@@ -35,7 +39,12 @@ function formatFileSize(size: number) {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function Dashboard() {
+type DashboardProps = {
+  user: User;
+  onLogout: () => void;
+};
+
+function Dashboard({ user, onLogout }: DashboardProps) {
   const inputId = useId();
   const [file, setFile] = useState<File | null>(null);
   const [data, setData] = useState<UploadResponse | null>(null);
@@ -73,7 +82,13 @@ function Dashboard() {
       const response = await API.post<UploadResponse>("/upload", formData);
 
       if (response.data.error) {
-        setError(response.data.error);
+        const missing = response.data.missing_columns?.length
+          ? ` Missing: ${response.data.missing_columns.join(", ")}.`
+          : "";
+        const detected = response.data.detected_columns?.length
+          ? ` Found: ${response.data.detected_columns.join(", ")}.`
+          : "";
+        setError(`${response.data.message ?? response.data.error}.${missing}${detected}`.replace(/\.\./g, "."));
         return;
       }
 
@@ -87,6 +102,17 @@ function Dashboard() {
 
   return (
     <main className="dashboard-shell">
+      <header className="app-topbar">
+        <div>
+          <p className="eyebrow">Signed in</p>
+          <strong className="topbar-name">{user.name}</strong>
+          <p className="topbar-email">{user.email}</p>
+        </div>
+        <button className="secondary-button" type="button" onClick={onLogout}>
+          Logout
+        </button>
+      </header>
+
       <section className="hero-panel">
         <div className="hero-copy">
           <p className="eyebrow">ProcessMind AI</p>
@@ -181,15 +207,31 @@ function Dashboard() {
                 </article>
               </div>
               <p className="feedback-message">{data.message ?? "Upload completed."}</p>
-              {data.columns && data.columns.length > 0 && (
-                <div className="detected-columns">
-                  {data.columns.map((column) => (
-                    <span key={column} className="detected-pill">
-                      {column}
-                    </span>
-                  ))}
-                </div>
+              {data.detected_columns && data.detected_columns.length > 0 && (
+                <>
+                  <p className="feedback-label">Detected columns</p>
+                  <div className="detected-columns">
+                    {data.detected_columns.map((column) => (
+                      <span key={column} className="detected-pill">
+                        {column}
+                      </span>
+                    ))}
+                  </div>
+                </>
               )}
+              {data.columns && data.columns.length > 0 && (
+                <>
+                  <p className="feedback-label">Normalized columns</p>
+                  <div className="detected-columns">
+                    {data.columns.map((column) => (
+                      <span key={column} className="detected-pill">
+                        {column}
+                      </span>
+                    ))}
+                  </div>
+                </>
+              )}
+              
             </div>
           )}
         </aside>
