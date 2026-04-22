@@ -1,6 +1,10 @@
 # app/api/endpoints/upload.py
-from fastapi import APIRouter, File, UploadFile
+from fastapi import APIRouter, Depends, File, UploadFile
 import pandas as pd
+
+from app.models.user_model import User
+from app.services.auth_service import get_current_user
+from app.services.process_service import store_uploaded_log
 
 router = APIRouter()
 
@@ -24,7 +28,10 @@ def normalize_column_name(name: str) -> str:
 
 
 @router.post("/")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
     df = pd.read_csv(file.file)
     original_columns = list(df.columns)
     normalized_columns = {normalize_column_name(column): column for column in original_columns}
@@ -57,6 +64,7 @@ async def upload_file(file: UploadFile = File(...)):
         }
 
     df = df.rename(columns={source: target for target, source in resolved_columns.items()})
+    store_uploaded_log(current_user.email, df)
 
     return {
         "message": "File uploaded successfully",

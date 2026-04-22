@@ -15,7 +15,9 @@ SECRET_KEY = os.getenv("SECRET_KEY", "processmind-dev-secret")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Keep bcrypt verification for existing users, but hash new passwords with
+# pbkdf2_sha256 to avoid runtime incompatibilities with newer bcrypt builds.
+pwd_context = CryptContext(schemes=["pbkdf2_sha256", "bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 

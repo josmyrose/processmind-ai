@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
+import type { AxiosError } from "axios";
 import API from "../api/api";
 
 type User = {
@@ -30,6 +31,31 @@ const initialLoginForm = {
   password: "",
 };
 
+function getRequestErrorMessage(error: unknown, fallbackMessage: string) {
+  const requestError = error as AxiosError<{ detail?: string | { msg?: string }[] }>;
+  const detail = requestError?.response?.data?.detail;
+
+  if (typeof detail === "string" && detail.trim()) {
+    return detail;
+  }
+
+  if (Array.isArray(detail) && detail.length > 0) {
+    const firstMessage = detail
+      .map((entry) => entry?.msg?.trim())
+      .find((message): message is string => Boolean(message));
+
+    if (firstMessage) {
+      return firstMessage;
+    }
+  }
+
+  if (requestError?.message === "Network Error") {
+    return "Cannot reach the authentication service. Make sure the backend is running and allows this frontend origin.";
+  }
+
+  return fallbackMessage;
+}
+
 function AuthPage({ onAuthenticated }: AuthPageProps) {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [registerForm, setRegisterForm] = useState(initialRegisterForm);
@@ -44,8 +70,8 @@ function AuthPage({ onAuthenticated }: AuthPageProps) {
     try {
       const response = await API.post<AuthResponse>("/auth/register", registerForm);
       onAuthenticated(response.data);
-    } catch (requestError: any) {
-      setError(requestError?.response?.data?.detail ?? "Registration failed. Please try again.");
+    } catch (requestError) {
+      setError(getRequestErrorMessage(requestError, "Registration failed. Please try again."));
     } finally {
       setIsSubmitting(false);
     }
@@ -58,8 +84,8 @@ function AuthPage({ onAuthenticated }: AuthPageProps) {
     try {
       const response = await API.post<AuthResponse>("/auth/login", loginForm);
       onAuthenticated(response.data);
-    } catch (requestError: any) {
-      setError(requestError?.response?.data?.detail ?? "Login failed. Please try again.");
+    } catch (requestError) {
+      setError(getRequestErrorMessage(requestError, "Login failed. Please try again."));
     } finally {
       setIsSubmitting(false);
     }
